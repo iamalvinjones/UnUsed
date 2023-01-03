@@ -1,0 +1,139 @@
+<?php
+/*
+Plugin Name: UnUsed
+Plugin URI: https://example.com/unused
+Description: A plugin that deletes unused images in the media library.
+Version: 1.0
+Author: Your Name
+License: GPL2
+*/
+
+// Register the UnUsed dashboard widget
+function unused_register_dashboard_widget() {
+	wp_add_dashboard_widget(
+		'unused_dashboard_widget', // Widget slug
+		'UnUsed', // Title
+		'unused_dashboard_widget_callback' // Display function
+	);
+}
+add_action( 'wp_dashboard_setup', 'unused_register_dashboard_widget' );
+
+// The callback function for the UnUsed dashboard widget
+function unused_dashboard_widget_callback() {
+	// Get the list of unused images
+	$unused_images = unused_get_unused_images();
+
+	// Display the list of unused images
+	echo '<table class="wp-list-table widefat fixed striped">';
+	echo '<thead>';
+	echo '<tr>';
+	echo '<th scope="col" id="cb" class="manage-column column-cb check-column"><input id="cb-select-all-1" type="checkbox"></th>';
+	echo '<th scope="col" id="filename" class="manage-column column-filename column-primary">Filename</th>';
+	echo '<th scope="col" id="thumbnail" class="manage-column column-thumbnail">Thumbnail</th>';
+	echo '</tr>';
+	echo '</thead>';
+	echo '<tbody id="the-list">';
+	foreach ( $unused_images as $image ) {
+		echo '<tr>';
+		echo '<th scope="row" class="check-column"><input type="checkbox" name="unused_image[]" value="' . esc_attr( $image['ID'] ) . '"></th>';
+		echo '<td class="filename column-filename has-row-actions column-primary" data-colname="Filename">';
+		echo '<strong><a href="' . esc_url( $image['guid'] ) . '">' . esc_html( $image['post_title'] ) . '</a></strong>';
+		echo '</td>';
+		echo '<td class="thumbnail column-thumbnail" data-colname="Thumbnail">';
+		echo '<img src="' . esc_url( $image['thumbnail'] ) . '" alt="' . esc_attr( $image['post_title'] ) . '">';
+		echo '</td>';
+		echo '</tr>';
+	}
+	echo '</tbody>';
+	echo '<tfoot>';
+	echo '<tr>';
+	echo '<th scope="col" id="cb" class="manage-column column-cb check-column"><input id="cb-select-all-2" type="checkbox"></th>';
+	echo '<th scope="col" id="filename" class="manage-column column-filename column-primary">Filename</th> echo '<th scope="col" id="thumbnail" class="manage-column column-thumbnail">Thumbnail</th>';
+echo '</tr>';
+echo '</tfoot>';
+echo '</table>';
+
+// Display the bulk delete dropdown menu
+echo '<div class="tablenav top">';
+echo '<div class="alignleft actions bulkactions">';
+echo '<label for="bulk-action-selector-top" class="screen-reader-text">Select bulk action</label>';
+echo '<select name="action" id="bulk-action-selector-top">';
+echo '<option value="-1">Bulk Actions</option>';
+echo '<option value="delete">Delete</option>';
+echo '</select>';
+echo '<input type="submit" id="doaction" class="button action" value="Apply">';
+echo '</div>';
+echo '</div>';
+
+// Display the delete button
+echo '<p class="submit"><input type="submit" name="delete" id="delete" class="button button-primary" value="Delete"></p>';
+}
+
+// Get the list of unused images
+function unused_get_unused_images() {
+// Initialize the array of unused images
+$unused_images = array();
+
+// Get the pages in the trash, draft, and published states
+$trash_pages = get_posts( array(
+	'post_type' => 'page',
+	'post_status' => 'trash',
+	'posts_per_page' => -1,
+) );
+$draft_pages = get_posts( array(
+	'post_type' => 'page',
+	'post_status' => 'draft',
+	'posts_per_page' => -1,
+) );
+$published_pages = get_posts( array(
+	'post_type' => 'page',
+	'post_status' => 'publish',
+	'posts_per_page' => -1,
+) );
+
+// Merge the pages into a single array
+$pages = array_merge( $trash_pages, $draft_pages, $published_pages );
+
+// Loop through each page
+foreach ( $pages as $page ) {
+	// Get the page content
+	$page_content = $page->post_content;
+
+	// Get the images in the page content
+	preg_match_all( '/<img[^>]+>/i', $page_content, $page_images );
+
+	// Loop through each image
+	foreach ( $page_images[0] as $image ) {
+		// Get the image src
+		preg_match( '/src="([^"]+)"/i', $image, $image_src );
+		$image_src = $image_src[1];
+
+		// Get the image ID
+		$image_id = attachment_url_to_postid( $image_src );
+
+		// Add the image ID to the used images array
+		$used_images[] = $image_id;
+}
+}
+
+}
+
+// Handle the delete action
+function unused_handle_delete_action() {
+// Check if the delete action was triggered
+if ( isset( $_POST['action'] ) && $_POST['action'] == 'delete' ) {
+// Check if the unused_image parameter is set
+if ( isset( $_POST['unused_image'] ) ) {
+// Get the array of image IDs to delete
+$image_ids = $_POST['unused_image'];
+
+		// Loop through each image ID
+		foreach ( $image_ids as $image_id ) {
+			// Delete the image
+			wp_delete_attachment( $image_id, true );
+		}
+	}
+}
+
+}
+add_action( 'admin_init', 'unused_handle_delete_action' );
